@@ -153,7 +153,7 @@ public class Board {
 				selected = Parser.getPiece(in.next().toUpperCase(), board);
 				System.out.println();
 				if (selected == null || !selected.moveable || selected.team.ordinal() != turn % 2) {
-					System.out.println("This isn't a valid piece\n");
+					System.out.println("You can't move this\n");
 					continue;
 				}
 				chosenP = true;
@@ -212,20 +212,14 @@ public class Board {
 	 * But will also be used to prospect other potential
 	 * spaces the king could move to
 	 * 
-	 * Only the last moved piece can put the king in check
-	 * 
-	 * @param location
-	 *            where the "king" is
-	 * @return
-	 * 		Whether or not if that spot's safe
-	 */
-	
-	/**
 	 * Does this piece put the king in check?
 	 * 
 	 * @param p
+	 *            The piece that may be checking the space
 	 * @param loc
+	 *            The location that is potentially threatened
 	 * @return
+	 * 		Whether or not it's safe
 	 */
 	private boolean isCheck(Piece p, int[] loc) {
 		int[] oppLoc = locations.get(p);
@@ -235,10 +229,10 @@ public class Board {
 		else if (p.role == Role.PAWN) {
 			int inc = (int) Math.pow(-1, turn % 2);
 			if (loc[0] + inc >= 0 && loc[0] + inc < board.length) {
-				if (loc[1] + 1 >= 0 && loc[0] + 1 < board.length)
+				if (loc[1] + 1 >= 0 && loc[1] + 1 < board.length)
 					if (board[loc[0] + inc][loc[1] + 1] == p)
 						return true;
-				if (loc[1] - 1 >= 0 && loc[0] - 1 < board.length)
+				if (loc[1] - 1 >= 0 && loc[1] - 1 < board.length)
 					if (board[loc[0] + inc][loc[1] - 1] == p)
 						return true;
 			}
@@ -301,9 +295,13 @@ public class Board {
 	 * Helper calculator to do the brunt of the work
 	 * 
 	 * @param x
+	 *            x Val of the king
 	 * @param y
+	 *            y Val of the king
 	 * @param inc1
+	 *            How we increment the x coord
 	 * @param inc2
+	 *            How we increment the y coord
 	 */
 	private void critCheckCalc(int x, int y, int inc1, int inc2) {
 		
@@ -326,9 +324,12 @@ public class Board {
 					// If there was a first piece
 					else {
 						// If we found a critical piece
-						if (board[x + (i * inc1)][y + (i * inc2)].role == Role.QUEEN
-								|| board[x + (i * inc1)][y + (i * inc2)].role == Role.ROOK) {
+						if (board[x + (i * inc1)][y + (i * inc2)].role == Role.QUEEN // Any queen
+								|| (board[x + (i * inc1)][y + (i * inc2)].role == Role.ROOK && (inc1 == 0 || inc2 == 0)) // A rook on the plus
+								|| board[x + (i * inc1)][y + (i * inc2)].role == Role.BISHOP && (inc1 != 0 && inc2 != 0)) { // Or a bishop on a diag
 							first.critical = board[x + (i * inc1)][y + (i * inc2)];
+							// System.out.println(first.tag.trim() + " is blocking " + board[x + (i * inc1)][y + (i * inc2)].tag.trim() + " for the King");
+							
 							// If we're in check
 							if (Piece.check[turn % 2])
 								first.moveable = false;
@@ -359,7 +360,6 @@ public class Board {
 				}
 			}
 		}
-		return;
 	}
 	
 	// Movement \\
@@ -576,9 +576,19 @@ public class Board {
 					boolean valid = true;
 					int[] loc = locations.get(team[piece.team.ordinal()][6 + i]);
 					int inc = (loc[1] - y) / Math.abs(loc[1] - y);
+					// Make sure each space in between is empty
 					for (int j = y + inc; j != loc[1]; j += inc) {
 						if (board[x][j] != null)
 							valid = false;
+						else {
+							// If the spaces are empty, make sure that they wouldn't be put in check
+							int[] tempCheck = new int[] { x, j };
+							for (Piece p : team[(piece.team.ordinal() + 1) % 2]) {
+								if (p != null && isCheck(p, tempCheck))
+									valid = false;
+							}
+						}
+						
 					}
 					if (valid)
 						moves.add(loc);
@@ -722,6 +732,8 @@ public class Board {
 				continue;
 			}
 			pawn.tag = "" + pawn.tag.charAt(0) + pawn.role.toString().charAt(0) + "P";
+			if (pawn.role == Role.KNIGHT)
+				pawn.tag = pawn.tag.replace("K", "N");
 			valid = true;
 		}
 	}
