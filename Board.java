@@ -6,9 +6,7 @@ import java.util.Scanner;
 
 /*
  * TODO: 
- * - Implement Check System
  * - Apply Check System to movement options
- * - Implement Critical System
  * - Apply Critical System to movement options
  */
 
@@ -33,6 +31,10 @@ public class Board {
 	// then no need to recalculate the moves it can do
 	// Resets with each turn
 	private HashMap<Piece, ArrayList<int[]>> possibleMoves = new HashMap<Piece, ArrayList<int[]>>();
+	
+	// If we're in check, we need to check every possible space
+	// that can take us out from check asides from moving the King
+	private ArrayList<int[]> checkedMoves = new ArrayList<int[]>();
 	
 	int turn = 0; // To know whose turn it is
 	
@@ -123,8 +125,11 @@ public class Board {
 		while (!finish) {
 			// Updates & Checks
 			for (Piece p : team[(turn + 1) % 2]) {
-				if (p != null && isCheck(p, locations.get(team[turn % 2][0])))
+				if (p != null && isCheck(p, locations.get(team[turn % 2][0]))) {
 					Piece.check[turn % 2] = true;
+					team[turn % 2][0].critical = p;
+					break;
+				}
 			}
 			criticalCheck();
 			
@@ -192,8 +197,6 @@ public class Board {
 			
 			// Perform Movement
 			move(selected, origin, loc);
-			if (Piece.check[turn % 2])
-				Piece.check[turn % 2] = false;
 			
 			possibleMoves.clear();
 			turn++;
@@ -280,7 +283,83 @@ public class Board {
 	 * the piece is considered immovable
 	 */
 	private void criticalCheck() {
+		int[] loc = locations.get(team[turn % 2][0]);
+		// Plus
+		for (int i = -1; i < 2; i += 2) {
+			critCheckCalc(loc[0], loc[1], i, 0);
+			critCheckCalc(loc[0], loc[1], 0, i);
+		}
+		// Diagonals
+		for (int i = 0; i < 4; i++) {
+			int inc1 = (int) Math.pow(-1, i % 2);
+			int inc2 = (int) Math.pow(-1, i + (i / 2) % 2);
+			critCheckCalc(loc[0], loc[1], inc1, inc2);
+		}
+	}
+	
+	/**
+	 * Helper calculator to do the brunt of the work
+	 * 
+	 * @param x
+	 * @param y
+	 * @param inc1
+	 * @param inc2
+	 */
+	private void critCheckCalc(int x, int y, int inc1, int inc2) {
 		
+		// Setting the parameters
+		Piece first = null;
+		int xLim = (inc1 == -1) ? x : (inc1 == 0) ? 100 : board.length - 1 - x;
+		int yLim = (inc2 == -1) ? y : (inc2 == 0) ? 100 : board.length - 1 - y;
+		int lim = Math.min(xLim, yLim); // Number of rounds we can have
+		
+		for (int i = 1; i <= lim; i++) {
+			// If we encounter an occupied space
+			if (board[x + (i * inc1)][y + (i * inc2)] != null) {
+				// If that space isn't friendly
+				if (board[x + (i * inc1)][y + (i * inc2)].team.ordinal() != turn % 2) {
+					// If we haven't encountered a friendly piece
+					// It's either already checking us or can't reach the king
+					// In this case, it doesn't matter
+					if (first == null)
+						break;
+					// If there was a first piece
+					else {
+						// If we found a critical piece
+						if (board[x + (i * inc1)][y + (i * inc2)].role == Role.QUEEN
+								|| board[x + (i * inc1)][y + (i * inc2)].role == Role.ROOK) {
+							first.critical = board[x + (i * inc1)][y + (i * inc2)];
+							// If we're in check
+							if (Piece.check[turn % 2])
+								first.moveable = false;
+							// if the first piece was a knight
+							// We can't move this piece
+							else if (first.role == Role.KNIGHT)
+								first.moveable = false;
+							// if it's on the plus and the first was a pawn or bishop
+							else if (first.role == Role.BISHOP || first.role == Role.PAWN) {
+								if (inc1 == 0 || inc2 == 0)
+									first.moveable = false;
+							}
+							// if it's on the diagonal and the first was a rook
+							else if (first.role == Role.KNIGHT) {
+								if (inc1 != 0 && inc2 != 0)
+									first.moveable = false;
+							}
+							break;
+						}
+					}
+				}
+				// If that space is friendly
+				else {
+					if (first == null) // If it's the first occupied space
+						first = board[x + (i * inc1)][y + (i * inc2)]; // We'll take it into consideration
+					else // Otherwise it doesn't matter
+						break;
+				}
+			}
+		}
+		return;
 	}
 	
 	// Movement \\
@@ -309,7 +388,8 @@ public class Board {
 		else if (piece.role == Role.PAWN && Math.abs(origin[0] - newLoc[0]) == 2) // Extra space
 			piece.special = 1;
 		// Promotion!
-		else if (piece.role == Role.PAWN && ((newLoc[0] == 0 && piece.team == Color.BLACK) || (newLoc[0] == board.length - 1 && piece.team == Color.WHITE)))
+		else if (piece.role == Role.PAWN && ((newLoc[0] == 0 && piece.team == Color.BLACK)
+				|| (newLoc[0] == board.length - 1 && piece.team == Color.WHITE)))
 			promote(piece);
 		else if (piece.role == Role.PAWN) // Doesn't use the boost
 			piece.special = -1;
@@ -466,8 +546,6 @@ public class Board {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
 		
 		// Normal Movement
-		// TODO:
-		// Use Check System to double check potential moves
 		for (int i = -1; i < 2; i++) {
 			if (x + i < 0 || x + i >= board.length)
 				continue;
@@ -478,7 +556,7 @@ public class Board {
 					continue;
 				if (board[x + i][y + j] == null || board[x + i][y + j].team != piece.team) {
 					int[] potential = new int[] { x + i, y + j };
-					System.out.println("Checking if moving to " + xAxis[potential[1]] + (potential[0] + 1) + " is ok");
+					// System.out.println("Checking if moving to " + xAxis[potential[1]] + (potential[0] + 1) + " is ok");
 					boolean ok = true;
 					for (Piece p : team[(turn + 1) % 2]) {
 						if (p != null && isCheck(p, potential))
