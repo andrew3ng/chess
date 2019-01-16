@@ -17,7 +17,7 @@ public class Main {
 	 */
 	public static void main(String[] args) {
 		board = new Board();
-		System.out.println(board);
+		board.play();
 		// board.turn++;
 		// System.out.println(board);
 		

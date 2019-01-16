@@ -9,8 +9,6 @@ import java.util.Scanner;
  * - Implement Check System
  * - Implement Critical System
  * - Implement King Movement
- * - Implement Turn System
- * - Create a system to parse the user input
  */
 
 /**
@@ -116,6 +114,122 @@ public class Board {
 	 * 11. Next player's turn begins
 	 */
 	public void play() {
+		Piece selected = null; // Selected Piece
+		int[] origin = null;
+		int[] loc = null; // Selected Location
+		
+		boolean win = false;
+		boolean chosenP = false; // Has the Piece been chosen?
+		boolean chosenM = false; // Has the Move been chosen?
+		boolean valid = false;
+		
+		while (!win) {
+			// Updates pawns so they can't be caught in en passant anymore
+			for (int i = 8; i < 16; i++) {
+				if (team[turn % 2][i] != null && team[turn % 2][i].special == 1)
+					team[turn % 2][i].special = -1;
+			}
+			
+			// Choose a piece
+			chosenP = false;
+			chosenM = false;
+			valid = false;
+			while (!chosenP) {
+				System.out.println(this);
+				System.out.print("Which piece would you like to move? ");
+				selected = Parser.getPiece(in.next().toUpperCase(), board);
+				System.out.println();
+				if (selected == null || !selected.moveable || selected.team.ordinal() != turn % 2) {
+					System.out.println("This isn't a valid piece\n");
+					continue;
+				}
+				chosenP = true;
+			}
+			
+			// Get piece's location
+			for (int i = 0; i < board.length; i++) {
+				for (int j = 0; j < board.length; j++) {
+					if (selected == board[i][j])
+						origin = new int[] { i, j };
+				}
+			}
+			
+			// Choose a move for the piece
+			while (!chosenM) {
+				if (calcMoves(selected, origin[0], origin[1]).isEmpty()) {
+					System.out.println("This piece cannot move. Try another\n");
+					break;
+				}
+				System.out.println(getMoves(possibleMoves.get(selected)));
+				System.out.print("Where would you like to move? ('C' to cancel) ");
+				String cmd = in.next().toUpperCase();
+				System.out.println();
+				if (cmd.equals("C"))
+					break;
+				else
+					loc = Parser.getTile(cmd, board);
+				
+				if (loc == null) {
+					System.out.println("That's not a location on the board. Try again");
+					continue;
+				}
+				
+				for (int[] tile : possibleMoves.get(selected)) {
+					if (tile[0] == loc[0] && tile[1] == loc[1]) {
+						valid = true;
+						break;
+					}
+				}
+				if (!valid) {
+					System.out.println("Invalid move. Try again");
+					continue;
+				}
+				chosenM = true;
+			}
+			if (!chosenM) // Broke due to cancel, so redo everything
+				continue;
+			
+			// Perform Movement
+			move(selected, origin, loc);
+			// Updates & Checks
+			
+			possibleMoves.clear();
+			turn++;
+		}
+		
+	}
+	
+	/**
+	 * Moves a piece from one location to the new one, removing any opposing piece it lands on
+	 * 
+	 * @param piece
+	 * @param origin
+	 * @param newLoc
+	 */
+	private void move(Piece piece, int[] origin, int[] newLoc) {
+		Piece overridden = board[newLoc[0]][newLoc[1]];
+		
+		board[newLoc[0]][newLoc[1]] = piece;
+		board[origin[0]][origin[1]] = null;
+		
+		// Special cases
+		if (piece.role == Role.PAWN && Math.abs(origin[1] - newLoc[1]) == 1 && overridden == null) {
+			System.out.println("En Passant!");
+			overridden = board[newLoc[0]][origin[1]]; // En Passant
+			board[origin[0]][newLoc[1]] = null;
+		}
+		else if (piece.role == Role.PAWN && Math.abs(origin[0] - newLoc[0]) == 2) // Extra space
+			piece.special = 1;
+		else if ((piece.role == Role.ROOK || piece.role == Role.KING) && piece.special == 0)
+			piece.special = -1;
+		
+		// Remove overridden if needed
+		if (overridden != null) {
+			for (int i = 0; i < team[0].length; i++) {
+				if (team[overridden.team.ordinal()][i] == overridden)
+					team[overridden.team.ordinal()][i] = null;
+			}
+		}
 		
 	}
 	
