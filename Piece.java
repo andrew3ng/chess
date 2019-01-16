@@ -27,8 +27,17 @@ public class Piece {
 	// If the piece is a Queen, then it depends on its relation to the Queen
 	// If the King is in Check, then you can't move this piece
 	Piece critical = null;
-	int[] criticalLoc = null; // Gives the location of the critical piece
 	
+	/**
+	 * Constructs a basic piece based on the parameters
+	 * Tags are done based on the piece's role
+	 * If the piece is a King, Pawn, or Rook, then (more so for the king and pawn)
+	 * they get special moves that they can perform
+	 * 
+	 * @param team
+	 * @param role
+	 * @param num
+	 */
 	public Piece(Color team, Role role, int num) {
 		this.team = team;
 		this.role = role;

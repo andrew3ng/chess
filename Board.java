@@ -7,8 +7,9 @@ import java.util.Scanner;
 /*
  * TODO: 
  * - Implement Check System
+ * - Apply Check System to movement options
  * - Implement Critical System
- * - Implement King Movement
+ * - Apply Critical System to movement options
  */
 
 /**
@@ -25,7 +26,11 @@ public class Board {
 	private Piece[][] board = new Piece[8][8];
 	private Piece[][] team = new Piece[2][16]; // 0 is white, 1 is black
 	
-	// If the piece is returned to within the same turn, then no need to recalculate the moves it can do
+	// Locations of each piece
+	private HashMap<Piece, int[]> locations = new HashMap<Piece, int[]>();
+	
+	// If the piece is returned to within the same turn,
+	// then no need to recalculate the moves it can do
 	// Resets with each turn
 	private HashMap<Piece, ArrayList<int[]>> possibleMoves = new HashMap<Piece, ArrayList<int[]>>();
 	
@@ -42,25 +47,6 @@ public class Board {
 	}
 	
 	/**
-	 * Debugging for board; creates a game for testing movement
-	 * 
-	 * @param i
-	 */
-	public Board(int i) {
-		board[3][3] = new Piece(Color.WHITE, Role.QUEEN, 0);
-		board[1][2] = new Piece(Color.WHITE, Role.BISHOP, 0);
-		board[5][4] = new Piece(Color.WHITE, Role.KNIGHT, 0);
-		board[2][5] = new Piece(Color.WHITE, Role.PAWN, 0);
-		board[3][4] = new Piece(Color.BLACK, Role.BISHOP, 0);
-		board[3][0] = new Piece(Color.BLACK, Role.ROOK, 0);
-		System.out.println(getMoves(calcMoves(board[3][3], 3, 3)));
-		System.out.println(getMoves(calcMoves(board[1][2], 1, 2)));
-		System.out.println(getMoves(calcMoves(board[5][4], 5, 4)));
-		System.out.println(getMoves(calcMoves(board[2][5], 2, 5)));
-		
-	}
-	
-	/**
 	 * Creates the teams and places the respective pieces from left to right
 	 * Designated only for standard games and used only in the constructor
 	 * 
@@ -74,6 +60,9 @@ public class Board {
 		team[ord][1] = new Piece(color, Role.QUEEN, 0);
 		board[7 * ord][4] = team[ord][0]; // King's opposite of each other
 		board[7 * ord][3] = team[ord][1]; // Queen's on her color
+		// Update Locations
+		locations.put(team[ord][0], new int[] { 7 * ord, 4 });
+		locations.put(team[ord][1], new int[] { 7 * ord, 3 });
 		
 		for (int i = 0; i < 2; i++) { // For 2 of a kind (Bishops, Knights, and Rooks)
 			// If White and first, then off = 0
@@ -89,10 +78,18 @@ public class Board {
 			board[7 * ord][off * (board.length - 1) + (int) (Math.pow(-1, off) * 2)] = team[ord][2 + i];
 			board[7 * ord][off * (board.length - 1) + (int) (Math.pow(-1, off))] = team[ord][4 + i];
 			board[7 * ord][off * (board.length - 1)] = team[ord][6 + i];
+			// Update Locations
+			locations.put(team[ord][2 + i], new int[] { 7 * ord, off * (board.length - 1) + (int) (Math.pow(-1, off) * 2) });
+			locations.put(team[ord][4 + i], new int[] { 7 * ord, off * (board.length - 1) + (int) (Math.pow(-1, off)) });
+			locations.put(team[ord][6 + i], new int[] { 7 * ord, off * (board.length - 1) });
+			
 		}
 		for (int i = 0; i < 8; i++) { // For Pawns
 			team[ord][8 + i] = new Piece(color, Role.PAWN, i + 1);
+			// Put on the board
 			board[1 + (5 * ord)][((board.length - 1) * ord) + (int) (Math.pow(-1, ord) * i)] = team[ord][8 + i];
+			// Update Locations
+			locations.put(team[ord][8 + i], new int[] { 1 + (5 * ord), ((board.length - 1) * ord) + (int) (Math.pow(-1, ord) * i) });
 		}
 	}
 	
@@ -118,12 +115,19 @@ public class Board {
 		int[] origin = null;
 		int[] loc = null; // Selected Location
 		
-		boolean win = false;
+		boolean finish = false; // Has the game finished?
 		boolean chosenP = false; // Has the Piece been chosen?
 		boolean chosenM = false; // Has the Move been chosen?
-		boolean valid = false;
+		boolean valid = false; // Is the move valid?
 		
-		while (!win) {
+		while (!finish) {
+			// Updates & Checks
+			for (Piece p : team[(turn + 1) % 2]) {
+				if (p != null && isCheck(p, locations.get(team[turn % 2][0])))
+					Piece.check[turn % 2] = true;
+			}
+			criticalCheck();
+			
 			// Updates pawns so they can't be caught in en passant anymore
 			for (int i = 8; i < 16; i++) {
 				if (team[turn % 2][i] != null && team[turn % 2][i].special == 1)
@@ -136,6 +140,10 @@ public class Board {
 			valid = false;
 			while (!chosenP) {
 				System.out.println(this);
+				
+				if (Piece.check[turn % 2]) // If the king's in check
+					System.out.println("You're in Check!");
+				
 				System.out.print("Which piece would you like to move? ");
 				selected = Parser.getPiece(in.next().toUpperCase(), board);
 				System.out.println();
@@ -144,14 +152,7 @@ public class Board {
 					continue;
 				}
 				chosenP = true;
-			}
-			
-			// Get piece's location
-			for (int i = 0; i < board.length; i++) {
-				for (int j = 0; j < board.length; j++) {
-					if (selected == board[i][j])
-						origin = new int[] { i, j };
-				}
+				origin = locations.get(selected);
 			}
 			
 			// Choose a move for the piece
@@ -191,13 +192,98 @@ public class Board {
 			
 			// Perform Movement
 			move(selected, origin, loc);
-			// Updates & Checks
+			if (Piece.check[turn % 2])
+				Piece.check[turn % 2] = false;
 			
 			possibleMoves.clear();
 			turn++;
 		}
 		
 	}
+	
+	// Check and Critical System \\
+	
+	/**
+	 * Checks to see if some location is in check
+	 * Typically done for the king's location itself
+	 * But will also be used to prospect other potential
+	 * spaces the king could move to
+	 * 
+	 * Only the last moved piece can put the king in check
+	 * 
+	 * @param location
+	 *            where the "king" is
+	 * @return
+	 * 		Whether or not if that spot's safe
+	 */
+	
+	/**
+	 * Does this piece put the king in check?
+	 * 
+	 * @param p
+	 * @param loc
+	 * @return
+	 */
+	private boolean isCheck(Piece p, int[] loc) {
+		int[] oppLoc = locations.get(p);
+		if (p.role == Role.KING)
+			return Math.abs(oppLoc[1] - loc[1]) + Math.abs(oppLoc[0] - loc[0]) <= 2
+					&& Math.abs(oppLoc[1] - loc[1]) < 2 && Math.abs(oppLoc[0] - loc[0]) < 2;
+		else if (p.role == Role.PAWN) {
+			int inc = (int) Math.pow(-1, turn % 2);
+			if (loc[0] + inc >= 0 && loc[0] + inc < board.length) {
+				if (loc[1] + 1 >= 0 && loc[0] + 1 < board.length)
+					if (board[loc[0] + inc][loc[1] + 1] == p)
+						return true;
+				if (loc[1] - 1 >= 0 && loc[0] - 1 < board.length)
+					if (board[loc[0] + inc][loc[1] - 1] == p)
+						return true;
+			}
+		}
+		else if (p.role == Role.KNIGHT) {
+			Color t = (turn % 2 == 0) ? Color.WHITE : Color.BLACK;
+			ArrayList<int[]> potentSpots = calcKnight(new Piece(t, Role.KNIGHT, 0), loc[0], loc[1]);
+			for (int[] spot : potentSpots) {
+				if (spot[0] == oppLoc[0] && spot[1] == oppLoc[1])
+					return true;
+			}
+		}
+		else {
+			if (p.role != Role.ROOK) {
+				Color t = (turn % 2 == 0) ? Color.WHITE : Color.BLACK;
+				ArrayList<int[]> potentSpots = calcDiag(new Piece(t, Role.BISHOP, 0), loc[0], loc[1]);
+				for (int[] spot : potentSpots) {
+					if (spot[0] == oppLoc[0] && spot[1] == oppLoc[1])
+						return true;
+				}
+			}
+			if (p.role != Role.BISHOP) {
+				Color t = (turn % 2 == 0) ? Color.WHITE : Color.BLACK;
+				ArrayList<int[]> potentSpots = calcPlus(new Piece(t, Role.ROOK, 0), loc[0], loc[1]);
+				for (int[] spot : potentSpots) {
+					if (spot[0] == oppLoc[0] && spot[1] == oppLoc[1])
+						return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Checks to see which pieces are "critical" to the king's safety
+	 * Based on their current location
+	 * If some allied piece is the only piece in between the king and
+	 * an enemy bishop, queen, or rook, then that piece is critical.
+	 * 
+	 * A critical piece's movement then will be affected so that it
+	 * may only move on that line. Should the king be in check, then
+	 * the piece is considered immovable
+	 */
+	private void criticalCheck() {
+		
+	}
+	
+	// Movement \\
 	
 	/**
 	 * Moves a piece from one location to the new one, removing any opposing piece it lands on
@@ -212,6 +298,8 @@ public class Board {
 		board[newLoc[0]][newLoc[1]] = piece;
 		board[origin[0]][origin[1]] = null;
 		
+		locations.put(piece, newLoc);
+		
 		// Special cases
 		if (piece.role == Role.PAWN && Math.abs(origin[1] - newLoc[1]) == 1 && overridden == null) {
 			System.out.println("En Passant!");
@@ -220,7 +308,19 @@ public class Board {
 		}
 		else if (piece.role == Role.PAWN && Math.abs(origin[0] - newLoc[0]) == 2) // Extra space
 			piece.special = 1;
-		else if ((piece.role == Role.ROOK || piece.role == Role.KING) && piece.special == 0)
+		// Promotion!
+		else if (piece.role == Role.PAWN && ((newLoc[0] == 0 && piece.team == Color.BLACK) || (newLoc[0] == board.length - 1 && piece.team == Color.WHITE)))
+			promote(piece);
+		else if (piece.role == Role.PAWN) // Doesn't use the boost
+			piece.special = -1;
+		else if (overridden != null && overridden.team == piece.team) { // castling
+			board[origin[0]][origin[1]] = overridden;
+			locations.put(overridden, origin);
+			piece.special = -1;
+			overridden.special = -1;
+			return;
+		}
+		else if ((piece.role == Role.ROOK || piece.role == Role.KING) && piece.special == 0) // Piece's First move
 			piece.special = -1;
 		
 		// Remove overridden if needed
@@ -228,6 +328,7 @@ public class Board {
 			for (int i = 0; i < team[0].length; i++) {
 				if (team[overridden.team.ordinal()][i] == overridden)
 					team[overridden.team.ordinal()][i] = null;
+				locations.remove(overridden);
 			}
 		}
 		
@@ -292,21 +393,28 @@ public class Board {
 	private ArrayList<int[]> calcPawn(Piece piece, int x, int y) {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
 		int inc = (int) (Math.pow(-1, piece.team.ordinal()));
-		if (board[x + inc][y] == null) { // Normal Step
-			moves.add(new int[] { x + inc, y });
-			// Bonus Step
-			if (piece.special == 0 && board[x + (2 * inc)][y] == null)
-				moves.add(new int[] { x + (2 * inc), y });
-		}
-		for (int i = 0; i < 2; i++) { // Attacking and En Passant
-			int step = (int) Math.pow(-1, i);
-			if (y + step >= 0 && y + step < board.length) {
-				if (board[x + inc][y + step] != null && board[x + inc][y + step].team != piece.team)
-					moves.add(new int[] { x + inc, y + step });
-				if (board[x][y + step] != null && board[x][y + step].team != piece.team // En Passant
-						&& board[x][y + step].role == Role.PAWN && board[x][y + step].special == 1)
-					moves.add(new int[] { x + inc, y + step });
+		if (piece.critical == null) {
+			if (board[x + inc][y] == null) { // Normal Step
+				moves.add(new int[] { x + inc, y });
+				// Bonus Step
+				if (piece.special == 0 && board[x + (2 * inc)][y] == null)
+					moves.add(new int[] { x + (2 * inc), y });
 			}
+			for (int i = 0; i < 2; i++) { // Attacking and En Passant
+				int step = (int) Math.pow(-1, i);
+				if (y + step >= 0 && y + step < board.length) {
+					if (board[x + inc][y + step] != null && board[x + inc][y + step].team != piece.team)
+						moves.add(new int[] { x + inc, y + step });
+					if (board[x][y + step] != null && board[x][y + step].team != piece.team // En Passant
+							&& board[x][y + step].role == Role.PAWN && board[x][y + step].special == 1)
+						moves.add(new int[] { x + inc, y + step });
+				}
+			}
+		}
+		else if (piece.critical.role != Role.ROOK) {
+			int[] criticalLoc = locations.get(piece.critical);
+			if (criticalLoc[0] - x == inc && Math.abs(criticalLoc[1] - y) == 1)
+				moves.add(criticalLoc);
 		}
 		return moves;
 	}
@@ -323,16 +431,18 @@ public class Board {
 	 */
 	private ArrayList<int[]> calcKnight(Piece piece, int x, int y) {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
-		for (int i = 0; i < 4; i++) {
-			int next1 = (int) (Math.pow(-1, (i + (i / 2)) % 2)); // One Step
-			int next2 = 2 * (int) (Math.pow(-1, i)); // Two Step
-			if (x + next1 >= 0 && x + next1 < board.length && y + next2 >= 0 && y + next2 < board.length) {
-				if (board[x + next1][y + next2] == null || board[x + next1][y + next2].team != piece.team)
-					moves.add(new int[] { x + next1, y + next2 });
-			}
-			if (x + next2 >= 0 && x + next2 < board.length && y + next1 >= 0 && y + next1 < board.length) {
-				if (board[x + next2][y + next1] == null || board[x + next2][y + next1].team != piece.team)
-					moves.add(new int[] { x + next2, y + next1 });
+		if (piece.critical == null) {
+			for (int i = 0; i < 4; i++) {
+				int next1 = (int) (Math.pow(-1, (i + (i / 2)) % 2)); // One Step
+				int next2 = 2 * (int) (Math.pow(-1, i)); // Two Step
+				if (x + next1 >= 0 && x + next1 < board.length && y + next2 >= 0 && y + next2 < board.length) {
+					if (board[x + next1][y + next2] == null || board[x + next1][y + next2].team != piece.team)
+						moves.add(new int[] { x + next1, y + next2 });
+				}
+				if (x + next2 >= 0 && x + next2 < board.length && y + next1 >= 0 && y + next1 < board.length) {
+					if (board[x + next2][y + next1] == null || board[x + next2][y + next1].team != piece.team)
+						moves.add(new int[] { x + next2, y + next1 });
+				}
 			}
 		}
 		return moves;
@@ -355,6 +465,48 @@ public class Board {
 	private ArrayList<int[]> calcKing(Piece piece, int x, int y) {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
 		
+		// Normal Movement
+		// TODO:
+		// Use Check System to double check potential moves
+		for (int i = -1; i < 2; i++) {
+			if (x + i < 0 || x + i >= board.length)
+				continue;
+			for (int j = -1; j < 2; j++) {
+				if (i == 0 && j == 0)
+					continue;
+				if (y + j < 0 || y + j >= board.length)
+					continue;
+				if (board[x + i][y + j] == null || board[x + i][y + j].team != piece.team) {
+					int[] potential = new int[] { x + i, y + j };
+					System.out.println("Checking if moving to " + xAxis[potential[1]] + (potential[0] + 1) + " is ok");
+					boolean ok = true;
+					for (Piece p : team[(turn + 1) % 2]) {
+						if (p != null && isCheck(p, potential))
+							ok = false;
+					}
+					if (ok)
+						moves.add(potential);
+				}
+			}
+		}
+		
+		// Castling
+		if (piece.special == 0) {
+			// Looks at the rooks to see if we can castle
+			for (int i = 0; i < 2; i++) {
+				if (team[piece.team.ordinal()][6 + i] != null && team[piece.team.ordinal()][6 + i].special == 0) {
+					boolean valid = true;
+					int[] loc = locations.get(team[piece.team.ordinal()][6 + i]);
+					int inc = (loc[1] - y) / Math.abs(loc[1] - y);
+					for (int j = y + inc; j != loc[1]; j += inc) {
+						if (board[x][j] != null)
+							valid = false;
+					}
+					if (valid)
+						moves.add(loc);
+				}
+			}
+		}
 		return moves;
 	}
 	
@@ -469,6 +621,31 @@ public class Board {
 				break;
 		}
 		return moves;
+	}
+	
+	/**
+	 * Promotes a pawn into either a rook, a bishop, a knight, or a queen
+	 */
+	private void promote(Piece pawn) {
+		boolean valid = false;
+		while (!valid) {
+			System.out.println("Your pawn can promote. What would you like to promote it to?\n((Q)ueen/K(N)ight/(B)ishop/(R)ook)\n");
+			String wish = in.next().toLowerCase();
+			if (wish.startsWith("q"))
+				pawn.role = Role.QUEEN;
+			else if (wish.startsWith("n"))
+				pawn.role = Role.KNIGHT;
+			else if (wish.startsWith("b"))
+				pawn.role = Role.BISHOP;
+			else if (wish.startsWith("r"))
+				pawn.role = Role.ROOK;
+			else {
+				System.out.println("I don't understand. What do you want?\n");
+				continue;
+			}
+			pawn.tag = "" + pawn.tag.charAt(0) + pawn.role.toString().charAt(0) + "P";
+			valid = true;
+		}
 	}
 	
 	// Debugging Methods \\
