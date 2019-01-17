@@ -121,6 +121,7 @@ public class Board {
 		boolean chosenP = false; // Has the Piece been chosen?
 		boolean chosenM = false; // Has the Move been chosen?
 		boolean valid = false; // Is the move valid?
+		String cmd = "";
 		
 		while (!finish) {
 			// Updates & Checks
@@ -150,8 +151,13 @@ public class Board {
 					System.out.println("You're in Check!");
 				
 				System.out.print("Which piece would you like to move? ");
-				selected = Parser.getPiece(in.next().toUpperCase(), board);
 				System.out.println();
+				cmd = in.nextLine().toUpperCase();
+				if (cmd.startsWith("/")) {
+					Parser.getCmd(cmd, board);
+					continue;
+				}
+				selected = Parser.getPiece(cmd, board);
 				if (selected == null || !selected.moveable || selected.team.ordinal() != turn % 2) {
 					System.out.println("You can't move this\n");
 					continue;
@@ -168,10 +174,15 @@ public class Board {
 				}
 				System.out.println(getMoves(possibleMoves.get(selected)));
 				System.out.print("Where would you like to move? ('C' to cancel) ");
-				String cmd = in.next().toUpperCase();
+				cmd = in.nextLine().toUpperCase();
 				System.out.println();
+				
 				if (cmd.equals("C"))
 					break;
+				else if (cmd.startsWith("/")) {
+					Parser.getCmd(cmd, board);
+					continue;
+				}
 				else
 					loc = Parser.getTile(cmd, board);
 				
@@ -610,48 +621,8 @@ public class Board {
 	 */
 	private ArrayList<int[]> calcDiag(Piece piece, int x, int y) {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
-		int toLower = board.length - x - 1;
-		int toRight = board.length - y - 1;
-		for (int i = 1; i <= Math.min(x, y); i++) {
-			if (board[x - i][y - i] == null)
-				moves.add(new int[] { x - i, y - i });
-			else if (board[x - i][y - i].team != piece.team) {
-				moves.add(new int[] { x - i, y - i });
-				break;
-			}
-			else
-				break;
-		}
-		for (int i = 1; i <= Math.min(x, toRight); i++) {
-			if (board[x - i][y + i] == null)
-				moves.add(new int[] { x - i, y + i });
-			else if (board[x - i][y + i].team != piece.team) {
-				moves.add(new int[] { x - i, y + i });
-				break;
-			}
-			else
-				break;
-		}
-		for (int i = 1; i <= Math.min(toLower, y); i++) {
-			if (board[x + i][y - i] == null)
-				moves.add(new int[] { x + i, y - i });
-			else if (board[x + i][y - i].team != piece.team) {
-				moves.add(new int[] { x + i, y - i });
-				break;
-			}
-			else
-				break;
-		}
-		for (int i = 1; i <= Math.min(toLower, toRight); i++) {
-			if (board[x + i][y + i] == null)
-				moves.add(new int[] { x + i, y + i });
-			else if (board[x + i][y + i].team != piece.team) {
-				moves.add(new int[] { x + i, y + i });
-				break;
-			}
-			else
-				break;
-		}
+		for (int i = 0; i < 4; i++)
+			moves.addAll(calcLine(piece, x, y, (int) (Math.pow(-1, i)), (int) (Math.pow(-1, (i + i / 2) % 2))));
 		return moves;
 	}
 	
@@ -667,47 +638,30 @@ public class Board {
 	 */
 	private ArrayList<int[]> calcPlus(Piece piece, int x, int y) {
 		ArrayList<int[]> moves = new ArrayList<int[]>();
-		for (int i = x + 1; i < board.length; i++) {
-			if (board[i][y] == null)
-				moves.add(new int[] { i, y });
-			else if (board[i][y].team != piece.team) {
-				moves.add(new int[] { i, y });
-				break;
-			}
-			else
-				break;
-			
+		for (int i = -1; i < 2; i += 2) {
+			moves.addAll(calcLine(piece, x, y, i, 0));
+			moves.addAll(calcLine(piece, x, y, 0, i));
 		}
-		for (int i = x - 1; i >= 0; i--) {
-			if (board[i][y] == null)
-				moves.add(new int[] { i, y });
-			else if (board[i][y].team != piece.team) {
-				moves.add(new int[] { i, y });
-				break;
-			}
-			else
-				break;
-		}
-		for (int j = y + 1; j < board.length; j++) {
-			if (board[x][j] == null)
-				moves.add(new int[] { x, j });
-			else if (board[x][j].team != piece.team) {
-				moves.add(new int[] { x, j });
+		return moves;
+	}
+	
+	private ArrayList<int[]> calcLine(Piece p, int x, int y, int inc1, int inc2) {
+		ArrayList<int[]> moves = new ArrayList<int[]>();
+		int xLim = (inc1 == -1) ? x : (inc1 == 0) ? 100 : board.length - 1 - x;
+		int yLim = (inc2 == -1) ? y : (inc2 == 0) ? 100 : board.length - 1 - y;
+		int lim = Math.min(xLim, yLim); // Number of rounds we can have
+		
+		for (int i = 1; i <= lim; i++) {
+			if (board[x + (i * inc1)][y + (i * inc2)] == null)
+				moves.add(new int[] { x + (i * inc1), y + (i * inc2) });
+			else if (board[x + (i * inc1)][y + (i * inc2)].team.ordinal() != p.team.ordinal()) {
+				moves.add(new int[] { x + (i * inc1), y + (i * inc2) });
 				break;
 			}
 			else
 				break;
 		}
-		for (int j = y - 1; j >= 0; j--) {
-			if (board[x][j] == null)
-				moves.add(new int[] { x, j });
-			else if (board[x][j].team != piece.team) {
-				moves.add(new int[] { x, j });
-				break;
-			}
-			else
-				break;
-		}
+		
 		return moves;
 	}
 	
@@ -762,7 +716,7 @@ public class Board {
 		for (int i = start; i != end; i += inc) {
 			s += (8 - i) + " ";
 			for (int j = start; j != end; j += inc) // for testing: " + i + "," + j + "
-				s += (board[board.length - 1 - i][j] == null) ? "[   ]" : "[" + board[board.length - 1 - i][j].toString() + "]";
+				s += (board[board.length - 1 - i][j] == null) ? "[   ]" : "[" + board[board.length - 1 - i][j].tag + "]";
 			s += " " + (8 - i) + "\n";
 		}
 		
@@ -811,7 +765,7 @@ public class Board {
 					}
 				}
 				if (!can)
-					s += (board[board.length - 1 - i][j] == null) ? "[   ]" : "[" + board[board.length - 1 - i][j].toString() + "]";
+					s += (board[board.length - 1 - i][j] == null) ? "[   ]" : "[" + board[board.length - 1 - i][j].tag + "]";
 			}
 			s += " " + (8 - i) + "\n";
 		}

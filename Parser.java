@@ -12,11 +12,13 @@ import java.util.regex.Pattern;
  */
 public class Parser {
 	private static final String xAx = "ABCDEFGH";
-	private static final String piecePattern = "[BW]([KQ]P?|([BNR]([1-2]|P))|(P[1-8]))"; // RegEx for pieces
+	private static final String piecePattern = "[BW](([KQ]|QR)|([BNR]([1-2]|P))|(P[1-8]))"; // RegEx for pieces
 	private static final String tilePattern = "[A-H][1-8]"; // RegEx for Tiles
+	private static final String cmdGetPattern = "\\A/GET\\s((" + piecePattern + ")|(" + tilePattern + "))";
 	
 	private static final Pattern piecePat = Pattern.compile(piecePattern);
 	private static final Pattern tilePat = Pattern.compile(tilePattern);
+	private static Pattern cmdPat;
 	
 	private static Matcher m;
 	
@@ -47,6 +49,22 @@ public class Parser {
 		}
 		// System.out.println("Input unrecognizable");
 		return null;
+	}
+	
+	public static void getCmd(String input, Piece[][] board) {
+		cmdPat = Pattern.compile(cmdGetPattern);
+		System.out.println("Testing for command");
+		m = cmdPat.matcher(input);
+		if (m.matches()) {
+			System.out.println("Taking a command");
+			Piece p = getPiece(input.substring(5), board);
+			if (p == null)
+				System.out.println("Data not found");
+			else
+				System.out.println(p);
+		}
+		else
+			System.out.println("Command " + input + " not found\n");
 	}
 	
 }

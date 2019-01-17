@@ -57,6 +57,11 @@ public class Piece {
 	
 	@Override
 	public String toString() {
-		return tag;
+		String s = "Name: " + tag + "\nTeam: " + team + "\nRole: " + role + "\n";
+		s += (special == 0) ? "Can potentially perform a special move" : (special == 1) ? "Just took a bonus move" : "Can't perform a special move";
+		s += (critical != null && role != Role.KING) ? "\nProtects King from " + critical.tag
+				: (critical != null && role == Role.KING) ? "\nIn check to " + critical.tag : "\nCurrently not critical for the king's protection";
+		s += "\n";
+		return s;
 	}
 }
