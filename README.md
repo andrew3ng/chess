@@ -1,5 +1,5 @@
 # chess
-Chess fully implemented in Java to be played on the console/terminal
+Chess fully implemented in Java to be played on the console/terminal.
 Includes a debugging feature with basic load and save capabilities (so testing isn't as annoying).
 To turn debugging on, go to main and set the 'debug' flag to true. 
 The board will be have as if it's both players' turn at the same time, so feel free to play god.
