@@ -45,3 +45,4 @@ However, the debugger is still a little janky. lmk if there are any bugs with it
 - Implement basic GUI
 - Create basic AI
 - Update debugger to be less jank
+- Update the game to check for unwinnable/unfinishable states
